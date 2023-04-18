@@ -1,9 +1,8 @@
-const { EndBehaviorType, VoiceReceiver } = require('@discordjs/voice');
-const { pipeline, Readable } = require("stream");
-const witClient = require('node-witai-speech');
+const { EndBehaviorType } = require("@discordjs/voice");
+const { Readable } = require("stream");
+const witClient = require("node-witai-speech");
 const prism = require("prism-media");
-const util = require('util');
-const fs = require("fs");
+const util = require("util");
 
 class Transcriber {
   constructor(apiKey) {
@@ -22,15 +21,15 @@ class Transcriber {
   async convert_audio(input) {
     try {
       // stereo to mono channel
-      const data = new Int16Array(input)
-      const ndata = new Int16Array(data.length/2)
-      for (let i = 0, j = 0; i < data.length; i+=4) {
-        ndata[j++] = data[i]
-        ndata[j++] = data[i+1]
+      const data = new Int16Array(input);
+      const ndata = new Int16Array(data.length / 2);
+      for (let i = 0, j = 0; i < data.length; i += 4) {
+        ndata[j++] = data[i];
+        ndata[j++] = data[i + 1];
       }
       return Buffer.from(ndata);
     } catch (e) {
-      console.log('convert_audio: ', e)
+      console.log("convert_audio: ", e);
       throw e;
     }
   }
@@ -46,34 +45,52 @@ class Transcriber {
       }
       const extractSpeechIntent = util.promisify(witClient.extractSpeechIntent);
       var stream = Readable.from(buffer);
-      const contenttype = "audio/raw;encoding=signed-integer;bits=16;rate=48k;endian=little"
-      var output = await extractSpeechIntent(this.WITAPIKEY, stream, contenttype);
+      const contenttype =
+        "audio/raw;encoding=signed-integer;bits=16;rate=48k;endian=little";
+      var output = await extractSpeechIntent(
+        this.WITAPIKEY,
+        stream,
+        contenttype
+      );
       this.witAI_lastcallTS = Math.floor(new Date());
       if (raw) return output;
       if (typeof output == "object") return output;
-      output = output.split("\n").map((item) => item.trim()).join("");
+      output = output
+        .split("\n")
+        .map((item) => item.trim())
+        .join("");
       let idx = output.lastIndexOf("}{");
       let idx0 = output.lastIndexOf("}");
-      output = JSON.parse(output.substring(idx + 1, idx0 + 1).trim().replace(/\n/g, "").trim());
+      output = JSON.parse(
+        output
+          .substring(idx + 1, idx0 + 1)
+          .trim()
+          .replace(/\n/g, "")
+          .trim()
+      );
       output.text = output.text.replace(/\./g, "");
       stream.destroy();
       return output;
-    } catch(e) {
+    } catch (e) {
       console.log("Transcriber-error: ", e);
-      return {}
+      return {};
     }
   }
 
   listen(receiver, userId, user) {
     return new Promise(async (res, rej) => {
       const stream = receiver.subscribe(userId, {
-    		end: {
-    			behavior: EndBehaviorType.AfterSilence,
-    			duration: 300,
-    		}
+        end: {
+          behavior: EndBehaviorType.AfterSilence,
+          duration: 300,
+        },
       });
 
-      const decoder = new prism.opus.Decoder({ frameSize: 960, channels: 2, rate: 48000 });
+      const decoder = new prism.opus.Decoder({
+        frameSize: 960,
+        channels: 2,
+        rate: 48000,
+      });
       stream.pipe(decoder);
 
       let buffer = [];
@@ -84,10 +101,12 @@ class Transcriber {
         buffer = Buffer.concat(buffer);
         const duration = buffer.length / 48000 / 2;
         if (duration > 1.0 || duration < 19) {
-          let transcript = await this.transcribe(await this.convert_audio(buffer));
-          res({user: user, transcript: transcript });
+          let transcript = await this.transcribe(
+            await this.convert_audio(buffer)
+          );
+          res({ user: user, transcript: transcript });
         }
-      })
+      });
     });
   }
 }
