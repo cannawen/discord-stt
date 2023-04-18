@@ -77,7 +77,7 @@ class Transcriber {
     }
   }
 
-  listen(receiver, userId, user) {
+  listen(receiver, userId) {
     return new Promise(async (res, rej) => {
       const stream = receiver.subscribe(userId, {
         end: {
@@ -104,7 +104,7 @@ class Transcriber {
           let transcript = await this.transcribe(
             await this.convert_audio(buffer)
           );
-          res({ user: user, transcript: transcript });
+          res({ userId: userId, transcript: transcript });
         }
       });
     });
